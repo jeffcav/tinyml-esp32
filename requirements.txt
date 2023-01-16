@@ -1,0 +1,22 @@
+# machine learning dependencies
+numpy==1.21.6
+torch==1.11.0
+scikit-learn==1.0.2
+torchvision==0.12.0
+
+# jupyper notebooks
+jupyter==1.0.0
+ipython==7.34.0
+ipykernel==6.16.0
+
+# utilities
+pyserial==3.5
+Pillow==9.3.0
+matplotlib==3.5.3
+
+# Might be required in the future
+# keras
+# pandas
+# scikeras
+# tensorflow
+# tensorflow-gpu
