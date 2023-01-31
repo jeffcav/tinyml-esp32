@@ -3,19 +3,22 @@
 #include <stdint.h>
 
 // multiply-and-accumulate (dot product) between two vectors
-void mac(const int8_t *x, const int8_t *y, int8_t x_zero, int8_t y_zero, int32_t *out, int size) {
+void mac(const int8_t *x, const int8_t *y, int32_t *out, int size) {
     int32_t acc = 0;
 
     for (int i = 0; i < size; i++)
-        acc += (int32_t)((x[i] - x_zero) * (y[i] - y_zero));
+        acc += (int32_t)(x[i] * y[i]);
 
     *out = acc;
 }
 
 // matrix-vector multiplication
-void mvm(const struct qlayer *qlayer, const int8_t *M, const int8_t *v, int32_t *out, int nrows, int ncols) {
+void mvm(const struct qlayer *qlayer, const int8_t *M, int8_t *v, int32_t *out, int nrows, int ncols) {
+    for (int i = 0; i < ncols; i++)
+        v[i] = (v[i] - qlayer->input.zero);
+    
     for (int row = 0; row < nrows; row++)
-        mac(&M[row*ncols], v, qlayer->weights.zero, qlayer->input.zero, &out[row], ncols);
+        mac(&M[row*ncols], v, &out[row], ncols);
 }
 
 // computes the relu activation function over a vector
