@@ -30,6 +30,26 @@ uart_config_t uart_config = {
     .source_clk = UART_SCLK_DEFAULT,
 };
 
+/**
+ * Magic numbers explained:
+ * 
+ * 165 is the input size
+ * 96 is the number of neurons in the first hidden layer
+ * 15 is the number of neurons in the output layer
+ * 
+*/
+int run_mlp(float *input) {
+    int output;
+
+    mvm(layer_0_weights, input, layer_0_output, 96, 165);
+    relu(layer_0_output, layer_1_output, 96);
+
+    mvm(layer_2_weights, layer_1_output, layer_2_output, 15, 96);
+    output = argmax(layer_2_output, 15);
+
+    return output;
+}
+
 void setup_uart() {
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
@@ -66,20 +86,8 @@ void app_main(void)
         // fetch current CPU cycle count
         asm volatile("esync; rsr %0,ccount":"=a" (begin));
 
-        // neural net layer 0
-        mvm(layer_0_weights, input, layer_0_output, 96, 165);
-        add(layer_0_output, layer_0_bias, layer_0_output, 96);
-
-        // neural net layer 1
-        relu(layer_0_output, layer_1_output, 96);
-
-        // neural net layer 2
-        mvm(layer_2_weights, layer_1_output, layer_2_output, 15, 96);
-        add(layer_2_output, layer_2_bias, layer_2_output, 15);
-
-        // neural net output
-        subject_id = argmax(layer_2_output, 15);
-
+        subject_id = run_mlp(input);
+        
         // fetch current CPU cycle count
         asm volatile("esync; rsr %0,ccount":"=a" (end));
 

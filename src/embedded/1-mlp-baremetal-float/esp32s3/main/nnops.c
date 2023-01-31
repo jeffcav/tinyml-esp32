@@ -1,10 +1,4 @@
-// adds two vectors
-void add(const float *x, const float *y, float *out, int size) {
-    int i;
-
-    for (i = 0; i < size; i++)
-        out[i] = x[i] + y[i];
-}
+#include <nnops.h>
 
 // multiply-and-accumulate (dot product) between two vectors
 void mac(const float *x, const float *y, float *out, int size) {
