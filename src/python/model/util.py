@@ -59,3 +59,19 @@ def get_bias(model_state_dict, layer_idx):
         raise KeyError(f'layers.{layer_idx}.bias')
 
     return bias
+
+def get_scale(qmodel_state_dict, layer_idx):
+    w_scale = qmodel_state_dict[f'{layer_idx}._packed_params._packed_params'][0][0].q_scale()
+    out_scale = qmodel_state_dict[f'{layer_idx}.scale']
+    return w_scale, out_scale.numpy()
+
+def get_zero(qmodel_state_dict, layer_idx):
+    w_zero = qmodel_state_dict[f'{layer_idx}._packed_params._packed_params'][0][0].q_zero_point()
+    out_zero = qmodel_state_dict[f'{layer_idx}.zero_point']
+    return w_zero, out_zero.numpy()
+
+def get_input_qparams(qmodel_state_dict):
+    scale = qmodel_state_dict[f'0.scale'][0].numpy()
+    zero_point = qmodel_state_dict[f'0.zero_point'][0].numpy()
+
+    return scale, zero_point
