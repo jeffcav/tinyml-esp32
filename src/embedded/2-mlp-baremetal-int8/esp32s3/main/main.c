@@ -98,10 +98,10 @@ int run_mlp(const float *input) {
 
 void app_main(void)
 {
-    int r;
+    char cmd;
+    int recv_bytes;
     int subject_id;
-    int begin, end, elapsed;
-    char cmd = CMD_NOOP;
+    int time_begin, time_end, time_elapsed;
 
     char msg_ready[] = "Ready\n";
     char msg_error[] = "Error\n";
@@ -113,31 +113,24 @@ void app_main(void)
     uart_write_bytes(UART_NUM, msg_ready, strlen(msg_ready));
 
     while (1) {
-        // log we are waiting for a new input
+        cmd = CMD_NOOP;
+
         uart_write_bytes(UART_NUM, msg_waiting, strlen(msg_waiting));
 
         while (cmd != CMD_INFERENCE_BEGIN)
             uart_read_bytes(UART_NUM, (char *)&cmd, sizeof(char), 100);
-        cmd = CMD_NOOP;
 
-        // read a new input
-        r = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
-        if (r != 165*sizeof(float))
+        recv_bytes = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
+        if (recv_bytes != 165*sizeof(float))
             uart_write_bytes(UART_NUM, msg_error, strlen(msg_error));
 
-        // fetch current CPU cycle count
-        asm volatile("esync; rsr %0,ccount":"=a" (begin));
-
+        asm volatile("esync; rsr %0,ccount":"=a" (time_begin));
         subject_id = run_mlp(input);
-        
-        // fetch current CPU cycle count
-        asm volatile("esync; rsr %0,ccount":"=a" (end));
+        asm volatile("esync; rsr %0,ccount":"=a" (time_end));
 
-        // log output
         uart_write_bytes(UART_NUM, &subject_id, sizeof(int));
 
-        // log elapsed time
-        elapsed = end-begin;
-        uart_write_bytes(UART_NUM, (int*)&elapsed, sizeof(int));
+        time_elapsed = time_end - time_begin;
+        uart_write_bytes(UART_NUM, (int*)&time_elapsed, sizeof(int));
     }
 }

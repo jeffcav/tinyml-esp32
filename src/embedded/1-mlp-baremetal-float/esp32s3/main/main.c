@@ -55,8 +55,8 @@ void app_main(void)
 {
     char cmd;
     int subject_id;
-    int bytes_count;
-    int begin, end, elapsed;
+    int recv_bytes;
+    int time_begin, time_end, time_elapsed;
 
     char msg_ready[] = "Ready\n";
     char msg_error[] = "Error\n";
@@ -66,24 +66,25 @@ void app_main(void)
     uart_write_bytes(UART_NUM, msg_ready, strlen(msg_ready));
 
     while (1) {
-        cmd = CMD_NOOP;        
+        cmd = CMD_NOOP;
+
         uart_write_bytes(UART_NUM, msg_waiting, strlen(msg_waiting));
 
         while (cmd != CMD_INFERENCE_BEGIN)
             uart_read_bytes(UART_NUM, (char *)&cmd, sizeof(char), 100);
 
-        bytes_count = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
+        recv_bytes = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
 
-        if (bytes_count != 165*sizeof(float))
+        if (recv_bytes != 165*sizeof(float))
             uart_write_bytes(UART_NUM, msg_error, strlen(msg_error));
 
-        asm volatile("esync; rsr %0,ccount":"=a" (begin));
+        asm volatile("esync; rsr %0,ccount":"=a" (time_begin));
         subject_id = run_mlp(input);
-        asm volatile("esync; rsr %0,ccount":"=a" (end));
+        asm volatile("esync; rsr %0,ccount":"=a" (time_end));
 
         uart_write_bytes(UART_NUM, &subject_id, sizeof(int));
 
-        elapsed = end-begin;
-        uart_write_bytes(UART_NUM, (int*)&elapsed, sizeof(int));
+        time_elapsed = time_end - time_begin;
+        uart_write_bytes(UART_NUM, (int*)&time_elapsed, sizeof(int));
     }
 }
