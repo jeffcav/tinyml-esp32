@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 
-void add(const float *x, const float *y, float *out, int size);
-void mac(const float *x, const float *y, float *out, int size);
+float mac(const float *x, const float *y, int size);
 void mvm(const float *M, const float *v, float *out, int nrows, int ncols);
 
 void relu(const float *x, float *out, int size);

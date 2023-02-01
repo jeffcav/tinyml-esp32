@@ -13,13 +13,8 @@
 #define CMD_NOOP 0
 #define CMD_INFERENCE_BEGIN 1
 
-// In a real-world implementation, we'd reuse
-// memory between layers, but for educational
-// purposes we're giving each a new buffer.
 float input[165];
-float layer_0_output[96];
-float layer_1_output[96];
-float layer_2_output[15];
+float buffer[96];
 
 uart_config_t uart_config = {
     .baud_rate = 115200,
@@ -41,11 +36,11 @@ uart_config_t uart_config = {
 int run_mlp(float *input) {
     int output;
 
-    mvm(layer_0_weights, input, layer_0_output, 96, 165);
-    relu(layer_0_output, layer_1_output, 96);
+    mvm(layer_0_weights, input, buffer, 96, 165);
+    relu(buffer, buffer, 96);
 
-    mvm(layer_2_weights, layer_1_output, layer_2_output, 15, 96);
-    output = argmax(layer_2_output, 15);
+    mvm(layer_2_weights, buffer, buffer, 15, 96);
+    output = argmax(buffer, 15);
 
     return output;
 }
@@ -58,9 +53,9 @@ void setup_uart() {
 
 void app_main(void)
 {
-    int r;
-    char cmd = 0;
+    char cmd;
     int subject_id;
+    int bytes_count;
     int begin, end, elapsed;
 
     char msg_ready[] = "Ready\n";
@@ -71,30 +66,23 @@ void app_main(void)
     uart_write_bytes(UART_NUM, msg_ready, strlen(msg_ready));
 
     while (1) {
-        // log we are waiting for a new input
+        cmd = CMD_NOOP;        
         uart_write_bytes(UART_NUM, msg_waiting, strlen(msg_waiting));
 
         while (cmd != CMD_INFERENCE_BEGIN)
             uart_read_bytes(UART_NUM, (char *)&cmd, sizeof(char), 100);
-        cmd = CMD_NOOP;
 
-        // read a new input
-        r = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
-        if (r != 165*sizeof(float))
+        bytes_count = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
+
+        if (bytes_count != 165*sizeof(float))
             uart_write_bytes(UART_NUM, msg_error, strlen(msg_error));
 
-        // fetch current CPU cycle count
         asm volatile("esync; rsr %0,ccount":"=a" (begin));
-
         subject_id = run_mlp(input);
-        
-        // fetch current CPU cycle count
         asm volatile("esync; rsr %0,ccount":"=a" (end));
 
-        // log output
         uart_write_bytes(UART_NUM, &subject_id, sizeof(int));
 
-        // log elapsed time
         elapsed = end-begin;
         uart_write_bytes(UART_NUM, (int*)&elapsed, sizeof(int));
     }
