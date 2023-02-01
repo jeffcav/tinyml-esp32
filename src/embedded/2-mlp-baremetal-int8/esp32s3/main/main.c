@@ -51,14 +51,16 @@ int run_mlp(const float *input) {
     int output;
 
     quantize(input, &l1_qparams.input, input_quantized, 165);
-    mvm(&l1_qparams, layer_1_weights, input_quantized, layer_1_output_quantized, 96, 165);
+
+    mvm(layer_1_weights, input_quantized, layer_1_output_quantized, l1_qparams.input.zero, 96, 165);
     dequantize(&l1_qparams, layer_1_output_quantized, layer_1_output, 96);
-    
+
     relu(layer_1_output, layer_2_output, 96);
     quantize(layer_2_output, &l3_qparams.input, layer_2_output_quantized, 96);
 
-    mvm(&l3_qparams, layer_3_weights, layer_2_output_quantized, layer_3_output_quantized, 15, 96);
+    mvm(layer_3_weights, layer_2_output_quantized, layer_3_output_quantized, l3_qparams.input.zero, 15, 96);
     dequantize(&l3_qparams, layer_3_output_quantized, layer_3_output, 15);
+
     output = argmax(layer_3_output, 15);
 
     return output;

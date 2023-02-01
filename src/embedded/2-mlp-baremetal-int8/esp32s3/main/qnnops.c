@@ -13,9 +13,9 @@ void mac(const int8_t *x, const int8_t *y, int32_t *out, int size) {
 }
 
 // matrix-vector multiplication
-void mvm(const struct qlayer *qlayer, const int8_t *M, int8_t *v, int32_t *out, int nrows, int ncols) {
+void mvm(const int8_t *M, int8_t *v, int32_t *out, int8_t v_zero, int nrows, int ncols) {
     for (int i = 0; i < ncols; i++)
-        v[i] = (v[i] - qlayer->input.zero);
+        v[i] = (v[i] - v_zero);
     
     for (int row = 0; row < nrows; row++)
         mac(&M[row*ncols], v, &out[row], ncols);
