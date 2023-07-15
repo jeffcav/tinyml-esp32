@@ -14,6 +14,7 @@ tabulate==0.9.0
 pyserial==3.5
 Pillow==9.3.0
 matplotlib==3.5.3
+tqdm==4.65.0
 
 # Might be required in the future
 # keras

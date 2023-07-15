@@ -22,12 +22,14 @@ uart_config_t uart_config = {
     .source_clk = UART_SCLK_DEFAULT,
 };
 
-float input[165];
-int8_t input_quantized[165];
+float input[132];
+int8_t input_quantized[132];
+int16_t input_quantized_s16[132];
 
 float buffer[96];
 int8_t buffer_int8[96];
 int32_t buffer_int32[96];
+int16_t buffer_s16[96];
 
 struct qlayer l1_qparams, l3_qparams;
 
@@ -72,7 +74,7 @@ void setup_uart() {
 /**
  * Magic numbers explained:
  * 
- * 165 is the input size
+ * 132 is the input size
  * 96 is the number of neurons in the first hidden layer
  * 15 is the number of neurons in the output layer
  * 
@@ -80,9 +82,9 @@ void setup_uart() {
 int run_mlp(const float *input) {
     int output;
 
-    quantize(input, l1_qparams.input.scale, l1_qparams.input.zero, input_quantized, 165);
+    quantize(input, l1_qparams.input.scale, l1_qparams.input.zero, input_quantized, 132);
 
-    mvm(layer_1_weights, input_quantized, buffer_int32, l1_qparams.input.zero, 96, 165);
+    mvm(layer_1_weights, input_quantized, buffer_int32, l1_qparams.input.zero, 96, 132);
     dequantize(&l1_qparams, buffer_int32, buffer, 96);
 
     relu(buffer, buffer, 96);
@@ -90,6 +92,33 @@ int run_mlp(const float *input) {
 
     mvm(layer_3_weights, buffer_int8, buffer_int32, l3_qparams.input.zero, 15, 96);
     dequantize(&l3_qparams, buffer_int32, buffer, 15);
+
+    output = argmax(buffer, 15);
+
+    return output;
+}
+
+/**
+ * Magic numbers explained:
+ * 
+ * 132 is the input size
+ * 96 is the number of neurons in the first hidden layer
+ * 15 is the number of neurons in the output layer
+ * 
+*/
+int run_mlp_s16(const float *input) {
+    int output;
+
+    quantize_s16(input, l1_qparams.input.scale, l1_qparams.input.zero, input_quantized_s16, 132);
+
+    mvm_s16(layer_1_weights_s16, input_quantized_s16, buffer_s16, l1_qparams.input.zero, 96, 132);
+    dequantize_s16(&l1_qparams, buffer_s16, buffer, 96);
+
+    relu(buffer, buffer, 96);
+    quantize_s16(buffer, l3_qparams.input.scale, l3_qparams.input.zero, buffer_s16, 96);
+
+    mvm_s16(layer_3_weights_s16, buffer_s16, buffer_s16, l3_qparams.input.zero, 15, 96);
+    dequantize_s16(&l3_qparams, buffer_s16, buffer, 15);
 
     output = argmax(buffer, 15);
 
@@ -120,12 +149,12 @@ void app_main(void)
         while (cmd != CMD_INFERENCE_BEGIN)
             uart_read_bytes(UART_NUM, (char *)&cmd, sizeof(char), 100);
 
-        recv_bytes = uart_read_bytes(UART_NUM, (float *)input, 165*4, 100000);
-        if (recv_bytes != 165*sizeof(float))
+        recv_bytes = uart_read_bytes(UART_NUM, (float *)input, 132*4, 100000);
+        if (recv_bytes != 132*sizeof(float))
             uart_write_bytes(UART_NUM, msg_error, strlen(msg_error));
 
         asm volatile("esync; rsr %0,ccount":"=a" (time_begin));
-        subject_id = run_mlp(input);
+        subject_id = run_mlp_s16(input);
         asm volatile("esync; rsr %0,ccount":"=a" (time_end));
 
         uart_write_bytes(UART_NUM, &subject_id, sizeof(int));
