@@ -6,7 +6,7 @@ int32_t mac(const int8_t *x, const int8_t *y, int size) {
     int32_t acc = 0;
 
     for (int i = 0; i < size; i++)
-        acc += (int32_t)(x[i] * y[i]);
+        acc += (int32_t)((int16_t)x[i] * (int16_t)y[i]);
 
     return acc;
 }

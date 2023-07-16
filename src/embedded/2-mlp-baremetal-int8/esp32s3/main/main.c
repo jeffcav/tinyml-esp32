@@ -8,6 +8,8 @@
 #include <qnnops.h>
 #include <mlp_weights.h>
 
+#include <esp_dsp.h>
+
 #define UART_NUM UART_NUM_0
 
 #define CMD_NOOP 0
@@ -109,15 +111,15 @@ int run_mlp(const float *input) {
 int run_mlp_s16(const float *input) {
     int output;
 
-    quantize_s16(input, l1_qparams.input.scale, l1_qparams.input.zero, input_quantized_s16, 132);
+    quantize_s16(input, l1_qparams.input.scale, (int16_t)l1_qparams.input.zero, input_quantized_s16, 132);
 
-    mvm_s16(layer_1_weights_s16, input_quantized_s16, buffer_s16, l1_qparams.input.zero, 96, 132);
+    mvm_s16(layer_1_weights_s16, input_quantized_s16, buffer_s16, (int16_t)l1_qparams.input.zero, 96, 132);
     dequantize_s16(&l1_qparams, buffer_s16, buffer, 96);
 
     relu(buffer, buffer, 96);
-    quantize_s16(buffer, l3_qparams.input.scale, l3_qparams.input.zero, buffer_s16, 96);
+    quantize_s16(buffer, l3_qparams.input.scale, (int16_t)l3_qparams.input.zero, input_quantized_s16, 96);
 
-    mvm_s16(layer_3_weights_s16, buffer_s16, buffer_s16, l3_qparams.input.zero, 15, 96);
+    mvm_s16(layer_3_weights_s16, input_quantized_s16, buffer_s16, (int16_t)l3_qparams.input.zero, 15, 96);
     dequantize_s16(&l3_qparams, buffer_s16, buffer, 15);
 
     output = argmax(buffer, 15);

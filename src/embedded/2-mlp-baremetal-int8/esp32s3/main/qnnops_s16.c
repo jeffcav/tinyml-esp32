@@ -3,15 +3,15 @@
 #include <stdint.h>
 #include <esp_dsp.h>
 
-void mvm_s16(const int16_t *M, int16_t *v, int16_t *out, int8_t v_zero, int nrows, int ncols) {
+void mvm_s16(const int16_t *M, int16_t *v, int16_t *out, int16_t v_zero, int nrows, int ncols) {
     for (int i = 0; i < ncols; i++)
         v[i] = (v[i] - v_zero);
 
     for (int row = 0; row < nrows; row++)
-        dsps_dotprod_s16_ae32(&M[row*ncols], v, &out[row], ncols, 8);
+        dsps_dotprod_s16_ae32(&M[row*ncols], v, &out[row], ncols, 15);
 }
 
-void quantize_s16(const float *x, float scale, int8_t zero, int16_t *out, int size) {
+void quantize_s16(const float *x, float scale, int16_t zero, int16_t *out, int size) {
     for (int i = 0; i < size; i++)
         out[i] = (int16_t)(round(x[i] / scale) + zero);
 }
