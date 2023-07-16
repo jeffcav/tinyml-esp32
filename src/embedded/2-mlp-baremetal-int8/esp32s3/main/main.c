@@ -5,15 +5,19 @@
 #include <driver/uart.h>
 #include <driver/gpio.h>
 
-#include <qnnops.h>
+#include <nnops.h>
 #include <mlp_weights.h>
-
-#include <esp_dsp.h>
 
 #define UART_NUM UART_NUM_0
 
 #define CMD_NOOP 0
-#define CMD_INFERENCE_BEGIN 1
+#define CMD_INFERENCE_FLOAT       0b0001
+#define CMD_INFERENCE_FLOAT_ACCEL 0b0011
+#define CMD_INFERENCE_INT8        0b0101
+#define CMD_INFERENCE_INT8_ACCEL  0b1001
+
+
+#define IS_INFERENCE(x) (x & 1)
 
 uart_config_t uart_config = {
     .baud_rate = 115200,
@@ -25,13 +29,10 @@ uart_config_t uart_config = {
 };
 
 float input[132];
-int8_t input_quantized[132];
-int16_t input_quantized_s16[132];
+int16_t fxp_input[132];
 
 float buffer[96];
-int8_t buffer_int8[96];
-int32_t buffer_int32[96];
-int16_t buffer_s16[96];
+int16_t fxp_buffer[96];
 
 struct qlayer l1_qparams, l3_qparams;
 
@@ -73,54 +74,62 @@ void setup_uart() {
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, 1024 * 2, 1024 * 2, 0, NULL, 0));
 }
 
-/**
- * Magic numbers explained:
- * 
- * 132 is the input size
- * 96 is the number of neurons in the first hidden layer
- * 15 is the number of neurons in the output layer
- * 
-*/
-int run_mlp(const float *input) {
+int run_mlp(float *input) {
     int output;
 
-    quantize(input, l1_qparams.input.scale, l1_qparams.input.zero, input_quantized, 132);
+    mvm(layer_1_weights, input, buffer, LAYER_1_LEN, LAYER_INPUT_LEN);
+    relu(buffer, input, 96);
 
-    mvm(layer_1_weights, input_quantized, buffer_int32, l1_qparams.input.zero, 96, 132);
-    dequantize(&l1_qparams, buffer_int32, buffer, 96);
-
-    relu(buffer, buffer, 96);
-    quantize(buffer, l3_qparams.input.scale, l3_qparams.input.zero, buffer_int8, 96);
-
-    mvm(layer_3_weights, buffer_int8, buffer_int32, l3_qparams.input.zero, 15, 96);
-    dequantize(&l3_qparams, buffer_int32, buffer, 15);
-
-    output = argmax(buffer, 15);
+    mvm(layer_3_weights, input, buffer, LAYER_3_LEN, LAYER_1_LEN);
+    output = argmax(buffer, LAYER_3_LEN);
 
     return output;
 }
 
-/**
- * Magic numbers explained:
- * 
- * 132 is the input size
- * 96 is the number of neurons in the first hidden layer
- * 15 is the number of neurons in the output layer
- * 
-*/
-int run_mlp_s16(const float *input) {
+int run_mlpx(float *input) {
     int output;
 
-    quantize_s16(input, l1_qparams.input.scale, (int16_t)l1_qparams.input.zero, input_quantized_s16, 132);
+    mvmx(layer_1_weights, input, buffer, LAYER_1_LEN, LAYER_INPUT_LEN);
+    relu(buffer, input, 96);
 
-    mvm_s16(layer_1_weights_s16, input_quantized_s16, buffer_s16, (int16_t)l1_qparams.input.zero, 96, 132);
-    dequantize_s16(&l1_qparams, buffer_s16, buffer, 96);
+    mvmx(layer_3_weights, input, buffer, LAYER_3_LEN, LAYER_1_LEN);
+    output = argmax(buffer, LAYER_3_LEN);
 
-    relu(buffer, buffer, 96);
-    quantize_s16(buffer, l3_qparams.input.scale, (int16_t)l3_qparams.input.zero, input_quantized_s16, 96);
+    return output;
+}
 
-    mvm_s16(layer_3_weights_s16, input_quantized_s16, buffer_s16, (int16_t)l3_qparams.input.zero, 15, 96);
-    dequantize_s16(&l3_qparams, buffer_s16, buffer, 15);
+int run_mlp8(const float *input) {
+    int output;
+
+    quantize8(input, l1_qparams.input.scale, l1_qparams.input.zero, (int8_t*)fxp_input, LAYER_INPUT_LEN);
+
+    mvm8(layer_1_weights8, (int8_t*)fxp_input, fxp_buffer, l1_qparams.input.zero, LAYER_1_LEN, LAYER_INPUT_LEN);
+    dequantize16(&l1_qparams, fxp_buffer, buffer, 96);
+
+    relu(buffer, buffer, LAYER_1_LEN);
+    quantize8(buffer, l3_qparams.input.scale, l3_qparams.input.zero, (int8_t*)fxp_input, LAYER_1_LEN);
+
+    mvm8(layer_3_weights8, (int8_t*)fxp_input, fxp_buffer, l3_qparams.input.zero, LAYER_3_LEN, LAYER_1_LEN);
+    dequantize16(&l3_qparams, fxp_buffer, buffer, LAYER_3_LEN);
+
+    output = argmax(buffer, LAYER_3_LEN);
+
+    return output;
+}
+
+int run_mlp16(const float *input) {
+    int output;
+
+    quantize16(input, l1_qparams.input.scale, (int16_t)l1_qparams.input.zero, fxp_input, LAYER_INPUT_LEN);
+
+    mvm16(layer_1_weights16, fxp_input, fxp_buffer, (int16_t)l1_qparams.input.zero, LAYER_1_LEN, LAYER_INPUT_LEN);
+    dequantize16(&l1_qparams, fxp_buffer, buffer, LAYER_1_LEN);
+
+    relu(buffer, buffer, LAYER_1_LEN);
+    quantize16(buffer, l3_qparams.input.scale, (int16_t)l3_qparams.input.zero, fxp_input, LAYER_1_LEN);
+
+    mvm16(layer_3_weights16, fxp_input, fxp_buffer, (int16_t)l3_qparams.input.zero, LAYER_3_LEN, LAYER_1_LEN);
+    dequantize16(&l3_qparams, fxp_buffer, buffer, LAYER_3_LEN);
 
     output = argmax(buffer, 15);
 
@@ -148,7 +157,7 @@ void app_main(void)
 
         uart_write_bytes(UART_NUM, msg_waiting, strlen(msg_waiting));
 
-        while (cmd != CMD_INFERENCE_BEGIN)
+        while (!IS_INFERENCE(cmd))
             uart_read_bytes(UART_NUM, (char *)&cmd, sizeof(char), 100);
 
         recv_bytes = uart_read_bytes(UART_NUM, (float *)input, 132*4, 100000);
@@ -156,7 +165,22 @@ void app_main(void)
             uart_write_bytes(UART_NUM, msg_error, strlen(msg_error));
 
         asm volatile("esync; rsr %0,ccount":"=a" (time_begin));
-        subject_id = run_mlp_s16(input);
+        switch(cmd) {
+            case CMD_INFERENCE_FLOAT:
+                subject_id = run_mlp(input);
+                break;
+            case CMD_INFERENCE_FLOAT_ACCEL:
+                subject_id = run_mlpx(input);
+                break;
+            case CMD_INFERENCE_INT8:
+                subject_id = run_mlp8(input);
+                break;
+            case CMD_INFERENCE_INT8_ACCEL:
+                subject_id = run_mlp16(input);
+                break;
+            default:
+                subject_id = run_mlp(input);
+        }
         asm volatile("esync; rsr %0,ccount":"=a" (time_end));
 
         uart_write_bytes(UART_NUM, &subject_id, sizeof(int));
