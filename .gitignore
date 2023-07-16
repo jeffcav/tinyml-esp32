@@ -1,2 +1,9 @@
 **/__pycache__/
+**/.ipynb_checkpoints
+
 venv/
+
+src/embedded/mlp-face-recognition/esp32s3/.vscode
+src/embedded/mlp-face-recognition/esp32s3/build
+src/embedded/mlp-face-recognition/esp32s3/managed_components
+src/embedded/mlp-face-recognition/esp32s3/dependencies.lock
