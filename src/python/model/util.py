@@ -46,7 +46,8 @@ def test(model, device, test_loader):
 
 def get_weights(model_state_dict, layer_idx):
     if f'layers.{layer_idx}.weight' in model_state_dict.keys():
-        weights = model_state_dict[f'layers.{layer_idx}.weight'].numpy()
+        w = model_state_dict[f'layers.{layer_idx}.weight'].cpu()
+        weights = w.numpy()
     else:
         raise KeyError(f'layers.{layer_idx}.weight')
 
